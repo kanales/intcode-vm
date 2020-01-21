@@ -107,7 +107,7 @@ impl TryFrom<i64> for Opcode<Parameter<()>> {
         let op = match x % 100 {
             1 => Add(a, b, c),
             2 => Mul(a, b, c),
-            3 => Inp(c),
+            3 => Inp(a),
             4 => Out(a),
             5 => Jnz(a, b),
             6 => Jz(a, b),

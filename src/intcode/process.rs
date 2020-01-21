@@ -127,6 +127,119 @@ impl Process {
         let op = self.populate(code);
         Ok(op)
     }
+    /*
+    let curr = self.current()?;
+           match curr {
+           Add(a, b, c) => {
+               self.set(&c, self.get(&a)? + self.get(&b)?)?;
+               self.inc(4);
+               self.eval()
+           }
+           Mul(a, b, c) => {
+               let p1 = self.get(&a)?;
+               let p2 = self.get(&b)?;
+               self.set(&c, p1 * p2)?;
+               self.inc(4);
+               self.eval()
+           }
+           Out(a) => {
+               self.inc(2);
+               Output(self.get(&a)?)
+           }
+           Inp(a) => {
+               self.inc(2);
+               Input(a)
+           }
+           Jnz(a, b) => {
+               if self.get(&a)? != 0 {
+                   self.jmp(self.get(&b)?.try_into().unwrap()); // TODO fix this
+               } else {
+                   self.inc(3);
+               }
+               self.eval()
+           }
+           Jz(a, b) => {
+               if self.get(&a)? == 0 {
+                   self.jmp(self.get(&b)?.try_into().unwrap()); // TODO fix this
+               } else {
+                   self.inc(3);
+               }
+               self.eval()
+           }
+           Lt(a, b, c) => {
+               self.set(&c, if self.get(&a) < self.get(&b) { 1 } else { 0 })?;
+               self.inc(4);
+               self.eval()
+           }
+           Equ(a, b, c) => {
+               self.set(&c, if self.get(&a) == self.get(&b) { 1 } else { 0 })?;
+               self.inc(4);
+               self.eval()
+           }
+           Rbs(a) => {
+               let inc = self.get(&a).unwrap();
+               self.relbase += inc;
+               self.inc(2);
+               self.eval()
+           }
+           Hlt => Halt,
+       })
+       */
+
+    fn eval_inner(&mut self) -> Result<Evaluation, String> {
+        use Opcode::*;
+        loop {
+            let curr = self.current()?;
+            match curr {
+                Add(a, b, c) => {
+                    self.set(&c, self.get(&a)? + self.get(&b)?)?;
+                    self.inc(4);
+                }
+                Mul(a, b, c) => {
+                    let p1 = self.get(&a)?;
+                    let p2 = self.get(&b)?;
+                    self.set(&c, p1 * p2)?;
+                    self.inc(4);
+                }
+                Out(a) => {
+                    self.inc(2);
+                    return Ok(Output(self.get(&a)?));
+                }
+                Inp(a) => {
+                    self.inc(2);
+                    return Ok(Input(a));
+                }
+                Jnz(a, b) => {
+                    if self.get(&a)? != 0 {
+                        self.jmp(self.get(&b)?.try_into().unwrap()); // TODO fix this
+                    } else {
+                        self.inc(3);
+                    }
+                }
+                Jz(a, b) => {
+                    if self.get(&a)? == 0 {
+                        self.jmp(self.get(&b)?.try_into().unwrap()); // TODO fix this
+                    } else {
+                        self.inc(3);
+                    }
+                }
+                Lt(a, b, c) => {
+                    self.set(&c, if self.get(&a) < self.get(&b) { 1 } else { 0 })?;
+                    self.inc(4);
+                }
+                Equ(a, b, c) => {
+                    self.set(&c, if self.get(&a) == self.get(&b) { 1 } else { 0 })?;
+                    self.inc(4);
+                }
+                Rbs(a) => {
+                    let inc = self.get(&a).unwrap();
+                    self.relbase += inc;
+                    self.inc(2);
+                }
+                Hlt => return Ok(Halt),
+            }
+        }
+    }
 
     fn eval(&mut self) -> Evaluation {
         match self.eval_inner() {
@@ -163,67 +276,6 @@ impl Process {
 
     pub fn head(&self) -> i64 {
         self.intcode[0]
-    }
-
-    fn eval_inner(&mut self) -> Result<Evaluation, String> {
-        use Opcode::*;
-        let curr = self.current()?;
-        let ev = match curr {
-            Add(a, b, c) => {
-                self.set(&c, self.get(&a)? + self.get(&b)?)?;
-                self.inc(4);
-                self.eval()
-            }
-            Mul(a, b, c) => {
-                let p1 = self.get(&a)?;
-                let p2 = self.get(&b)?;
-                self.set(&c, p1 * p2)?;
-                self.inc(4);
-                self.eval()
-            }
-            Out(a) => {
-                self.inc(2);
-                Output(self.get(&a)?)
-            }
-            Inp(a) => {
-                self.inc(2);
-                Input(a)
-            }
-            Jnz(a, b) => {
-                if self.get(&a)? != 0 {
-                    self.jmp(self.get(&b)?.try_into().unwrap()); // TODO fix this
-                } else {
-                    self.inc(3);
-                }
-                self.eval()
-            }
-            Jz(a, b) => {
-                if self.get(&a)? == 0 {
-                    self.jmp(self.get(&b)?.try_into().unwrap()); // TODO fix this
-                } else {
-                    self.inc(3);
-                }
-                self.eval()
-            }
-            Lt(a, b, c) => {
-                self.set(&c, if self.get(&a) < self.get(&b) { 1 } else { 0 })?;
-                self.inc(4);
-                self.eval()
-            }
-            Equ(a, b, c) => {
-                self.set(&c, if self.get(&a) == self.get(&b) { 1 } else { 0 })?;
-                self.inc(4);
-                self.eval()
-            }
-            Rbs(a) => {
-                let inc = self.get(&a).unwrap();
-                self.relbase += inc;
-                self.inc(2);
-                self.eval()
-            }
-            Hlt => Halt,
-        };
-        Ok(ev)
     }
 
     pub fn status(&self) -> ProcessStatus {
