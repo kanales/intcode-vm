@@ -8,7 +8,12 @@ impl FromStr for Intcode {
     type Err = String;
 
     fn from_str(input: &str) -> Result<Intcode, Self::Err> {
-        let res: Result<Vec<i32>, ParseIntError> = input.split(",").map(|x| x.parse()).collect();
+        let res: Result<Vec<i32>, ParseIntError> = input
+            .replace("\n", "")
+            .replace(" ", "")
+            .split(",")
+            .map(|x| x.parse())
+            .collect();
         match res {
             Ok(v) => Ok(Intcode(v)),
             Err(_) => Err("Invalid intcode".to_string()),
