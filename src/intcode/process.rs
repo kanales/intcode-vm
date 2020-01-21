@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
 
@@ -8,6 +9,8 @@ use super::opcode::{Opcode, Parameter};
 pub struct Process {
     pc: usize,
     intcode: Vec<i32>,
+    memory: BTreeMap<i32, i32>,
+    relbase: i32,
     status: ProcessStatus,
 }
 
@@ -15,7 +18,7 @@ pub struct Process {
 pub enum ProcessStatus {
     Paused,
     Outputting(i32),
-    Awaiting(Parameter<usize>),
+    Awaiting(Parameter<i32>),
     Exit,
 }
 use ProcessStatus::*;
@@ -29,36 +32,60 @@ impl Process {
             pc: 0,
             intcode: v,
             status: Paused,
+            memory: BTreeMap::new(),
+            relbase: 0,
         }
     }
 
-    fn set(&mut self, param: &Parameter<usize>, value: i32) -> Result<(), String> {
+    fn set(&mut self, param: &Parameter<i32>, value: i32) -> Result<(), String> {
         match param {
-            Parameter::Pos(x) => Ok(self.intcode[*x] = value),
+            Parameter::Pos(key) => Ok({
+                self.memory.insert(*key, value);
+            }),
+            Parameter::Rel(x) => Ok({
+                let key = self.relbase + x;
+                self.memory.insert(key, value);
+            }),
             Parameter::Imm(_) => Err("Can't set to immediate value.".to_owned()),
         }
     }
 
-    fn try_set(&mut self, param: &Parameter<i32>, value: i32) -> Result<(), String> {
-        match *param {
-            Parameter::Imm(_) => Err("Can't set to immediate value.".to_owned()),
-            Parameter::Pos(p) => {
-                let x: usize = p
-                    .try_into()
-                    .map_err(|_| format!("Invalid index from {:?}", param).to_owned())?;
-                Ok(self.intcode[x] = value)
-            }
-        }
-    }
+    // fn try_set(&mut self, param: &Parameter<i32>, value: i32) -> Result<(), String> {
+    //     match *param {
+    //         Parameter::Imm(_) => Err("Can't set to immediate value.".to_owned()),
+    //         Parameter::Pos(p) => {
+    //             let x: usize = p
+    //                 .try_into()
+    //                 .map_err(|_| format!("Invalid index from {:?}", param).to_owned())?;
+    //             Ok(self.intcode[x] = value)
+    //         }
+    //     }
+    // }
 
     fn get(&self, param: &Parameter<i32>) -> Result<i32, String> {
         match *param {
             Parameter::Imm(x) => Ok(x),
+            // TODO join Pos and Rel
             Parameter::Pos(p) => {
-                let x: usize = p
-                    .try_into()
-                    .map_err(|_| format!("Invalid index from {:?}", param).to_owned())?;
-                Ok(self.intcode[x])
+                if let Some(x) = self.memory.get(&p) {
+                    Ok(*x)
+                } else {
+                    let x: usize = p
+                        .try_into()
+                        .map_err(|_| format!("Invalid index from {:?}", param).to_owned())?;
+                    Ok(self.intcode[x])
+                }
+            }
+            Parameter::Rel(rel_p) => {
+                let p = self.relbase + rel_p;
+                if let Some(x) = self.memory.get(&p) {
+                    Ok(*x)
+                } else {
+                    let x: usize = p
+                        .try_into()
+                        .map_err(|_| format!("Invalid index from {:?}", param).to_owned())?;
+                    Ok(self.intcode[x])
+                }
             }
         }
     }
@@ -72,12 +99,16 @@ impl Process {
     }
 
     fn inc_setter<'a>(&'a self) -> Box<dyn FnMut(&Parameter<()>) -> Parameter<i32> + 'a> {
-        let mut i = 0;
+        let mut i: i32 = 0;
         Box::new(move |m| {
             i += 1;
-            match m {
-                Parameter::Pos(_) => Parameter::Pos(self.intcode[self.pc + i]),
-                Parameter::Imm(_) => Parameter::Imm(self.intcode[self.pc + i]),
+            let pc: Result<i32, _> = self.pc.try_into();
+            match pc {
+                Ok(position) => {
+                    let value = self.get(&Parameter::Imm(position + i)).unwrap();
+                    m.map(|_| value)
+                }
+                Err(_) => unreachable!(),
             }
         })
     }
@@ -137,14 +168,14 @@ impl Process {
         let curr = self.current()?;
         let ev = match curr {
             Add(a, b, c) => {
-                self.try_set(&c, self.get(&a)? + self.get(&b)?)?;
+                self.set(&c, self.get(&a)? + self.get(&b)?)?;
                 self.inc(4);
                 self.eval()
             }
             Mul(a, b, c) => {
                 let p1 = self.get(&a)?;
                 let p2 = self.get(&b)?;
-                self.try_set(&c, p1 * p2)?;
+                self.set(&c, p1 * p2)?;
                 self.inc(4);
                 self.eval()
             }
@@ -152,7 +183,6 @@ impl Process {
                 self.inc(2);
                 Output(self.get(&a)?)
             }
-            // ugly af
             Inp(a) => {
                 self.inc(2);
                 Input(a.try_map(|&x| x.try_into()).unwrap())
@@ -174,13 +204,19 @@ impl Process {
                 self.eval()
             }
             Lt(a, b, c) => {
-                self.try_set(&c, if self.get(&a) < self.get(&b) { 1 } else { 0 })?;
+                self.set(&c, if self.get(&a) < self.get(&b) { 1 } else { 0 })?;
                 self.inc(4);
                 self.eval()
             }
             Equ(a, b, c) => {
-                self.try_set(&c, if self.get(&a) == self.get(&b) { 1 } else { 0 })?;
+                self.set(&c, if self.get(&a) == self.get(&b) { 1 } else { 0 })?;
                 self.inc(4);
+                self.eval()
+            }
+            Rbs(a) => {
+                let inc = self.get(&a).unwrap();
+                self.relbase += inc;
+                self.inc(2);
                 self.eval()
             }
             Hlt => Halt,
@@ -195,7 +231,7 @@ impl Process {
 
 use Evaluation::*;
 pub enum Evaluation {
-    Input(Parameter<usize>),
+    Input(Parameter<i32>),
     Output(i32),
     Halt,
     EvaluationError(String),

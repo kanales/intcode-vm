@@ -10,6 +10,7 @@ pub enum Opcode<A> {
     Jz(A, A),
     Lt(A, A, A),
     Equ(A, A, A),
+    Rbs(A),
     Hlt,
 }
 
@@ -18,6 +19,7 @@ use Parameter::*;
 pub enum Parameter<A> {
     Pos(A),
     Imm(A),
+    Rel(A),
 }
 
 use std::convert::TryFrom;
@@ -28,6 +30,7 @@ impl TryFrom<i32> for Parameter<()> {
         match item {
             0 => Ok(Pos(())),
             1 => Ok(Imm(())),
+            2 => Ok(Rel(())),
             m => Err(format!("Unknown mode {:?}", m).to_string()),
         }
     }
@@ -35,10 +38,11 @@ impl TryFrom<i32> for Parameter<()> {
 
 impl<T> Parameter<T> {
     #[allow(dead_code)]
-    fn map<B, F: Fn(&T) -> B>(&self, f: F) -> Parameter<B> {
+    pub fn map<B, F: Fn(&T) -> B>(&self, f: F) -> Parameter<B> {
         match self {
             Pos(x) => Pos(f(x)),
             Imm(x) => Imm(f(x)),
+            Rel(x) => Rel(f(x)),
         }
     }
 
@@ -49,6 +53,7 @@ impl<T> Parameter<T> {
         Ok(match self {
             Pos(x) => Pos(f(x)?),
             Imm(x) => Imm(f(x)?),
+            Rel(x) => Rel(f(x)?),
         })
     }
 }
@@ -68,6 +73,7 @@ impl<T> Opcode<T> {
             Jz(a, b) => Jz(f(a), f(b)),
             Lt(a, b, c) => Lt(f(a), f(b), f(c)),
             Equ(a, b, c) => Equ(f(a), f(b), f(c)),
+            Rbs(a) => Rbs(f(a)),
             _ => Hlt,
         }
     }
@@ -107,6 +113,7 @@ impl TryFrom<i32> for Opcode<Parameter<()>> {
             6 => Jz(a, b),
             7 => Lt(a, b, c),
             8 => Equ(a, b, c),
+            9 => Rbs(a),
             99 => Hlt,
             o => Err(format!("Unknown operation {:?}", o).to_string())?,
         };
