@@ -1,4 +1,4 @@
-use intcode_vm::intcode::{Intcode, Interpreter};
+use intcode_vm::{Intcode, Interpreter};
 
 use std::env;
 use std::fs::File;
@@ -26,16 +26,24 @@ fn main() {
 
     let stdin = io::stdin();
 
-    let inputs: Result<Vec<i32>, _> = stdin
+    let inputs: Result<Vec<i64>, _> = stdin
         .lock()
         .lines()
-        .map(|line| -> Result<i32, std::io::Error> { Ok(line?.parse::<i32>().unwrap()) })
+        .map(|line| -> Result<i64, std::io::Error> {
+            match line?.parse::<i64>() {
+                Ok(int) => Ok(int),
+                Err(_) => Err(std::io::Error::from(std::io::ErrorKind::InvalidInput)),
+            }
+        })
         .collect();
 
-    if let Ok(is) = inputs {
-        let mut interpreter = Interpreter::new(code);
-        for out in interpreter.execute(&mut is.into_iter()) {
-            println!("{}", out);
-        }
+    let mut inputiter = match inputs {
+        Ok(is) => is.into_iter(),
+        Err(_) => Vec::new().into_iter(),
+    };
+
+    let mut interpreter = Interpreter::new(code);
+    for out in interpreter.execute(&mut inputiter) {
+        println!("{}", out);
     }
 }

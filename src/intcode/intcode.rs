@@ -1,14 +1,14 @@
 use std::num::ParseIntError;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Intcode(pub Vec<i32>);
+pub struct Intcode(pub Vec<i64>);
 
 use std::str::FromStr;
 impl FromStr for Intcode {
     type Err = String;
 
     fn from_str(input: &str) -> Result<Intcode, Self::Err> {
-        let res: Result<Vec<i32>, ParseIntError> = input
+        let res: Result<Vec<i64>, ParseIntError> = input
             .replace("\n", "")
             .replace(" ", "")
             .split(",")
@@ -22,8 +22,8 @@ impl FromStr for Intcode {
 }
 
 use std::convert::Into;
-impl Into<Vec<i32>> for Intcode {
-    fn into(self) -> Vec<i32> {
+impl Into<Vec<i64>> for Intcode {
+    fn into(self) -> Vec<i64> {
         match self {
             Intcode(c) => c,
         }
@@ -31,7 +31,7 @@ impl Into<Vec<i32>> for Intcode {
 }
 
 impl Intcode {
-    pub fn replace(&self, noun: i32, verb: i32) -> Intcode {
+    pub fn replace(&self, noun: i64, verb: i64) -> Intcode {
         let Intcode(arr) = self;
         let mut newarr = arr.clone();
         newarr[1] = noun;

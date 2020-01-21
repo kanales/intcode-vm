@@ -5,15 +5,15 @@ pub struct Interpreter {
     process: Process,
 }
 
-pub struct IntcodeOut<'a, I: Iterator<Item = i32>> {
+pub struct IntcodeOut<'a, I: Iterator<Item = i64>> {
     inputs: I,
     interpreter: &'a mut Interpreter,
 }
 
-impl<'a, I: Iterator<Item = i32>> Iterator for IntcodeOut<'a, I> {
-    type Item = i32;
+impl<'a, I: Iterator<Item = i64>> Iterator for IntcodeOut<'a, I> {
+    type Item = i64;
 
-    fn next(&mut self) -> Option<i32> {
+    fn next(&mut self) -> Option<i64> {
         let proc = &mut self.interpreter.process;
         loop {
             match proc.resume() {
@@ -41,7 +41,7 @@ impl Interpreter {
 
     pub fn execute<'a, Input>(&'a mut self, inputs: Input) -> IntcodeOut<'a, Input::IntoIter>
     where
-        Input: IntoIterator<Item = i32>,
+        Input: IntoIterator<Item = i64>,
     {
         let it = inputs.into_iter();
         IntcodeOut {
@@ -59,6 +59,6 @@ fn interpreter_test() {
     let inputs = vec![1, 2, 3];
     let mut inputs_iter = inputs.into_iter();
     let out = interpreter.execute(&mut inputs_iter);
-    let out_vec: Vec<i32> = out.collect();
+    let out_vec: Vec<i64> = out.collect();
     assert_eq!(out_vec, vec![3, 2, 1]);
 }

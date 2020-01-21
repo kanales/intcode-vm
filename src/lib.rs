@@ -1,1 +1,3 @@
-pub mod intcode;
+mod intcode;
+
+pub use intcode::*;

@@ -23,10 +23,10 @@ pub enum Parameter<A> {
 }
 
 use std::convert::TryFrom;
-impl TryFrom<i32> for Parameter<()> {
+impl TryFrom<i64> for Parameter<()> {
     type Error = String;
 
-    fn try_from(item: i32) -> Result<Self, Self::Error> {
+    fn try_from(item: i64) -> Result<Self, Self::Error> {
         match item {
             0 => Ok(Pos(())),
             1 => Ok(Imm(())),
@@ -58,8 +58,8 @@ impl<T> Parameter<T> {
     }
 }
 
-fn digit(x: i32, i: u32) -> i32 {
-    x / 10_i32.pow(i) % 10
+fn digit(x: i64, i: u32) -> i64 {
+    x / 10_i64.pow(i) % 10
 }
 
 impl<T> Opcode<T> {
@@ -95,10 +95,10 @@ impl<T> Opcode<T> {
 }
 
 use std::convert::TryInto;
-impl TryFrom<i32> for Opcode<Parameter<()>> {
+impl TryFrom<i64> for Opcode<Parameter<()>> {
     type Error = String;
 
-    fn try_from(x: i32) -> Result<Opcode<Parameter<()>>, Self::Error> {
+    fn try_from(x: i64) -> Result<Opcode<Parameter<()>>, Self::Error> {
         let p = |i| digit(x / 100, i).try_into();
 
         let a: Parameter<()> = p(0)?;

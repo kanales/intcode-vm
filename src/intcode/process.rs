@@ -8,17 +8,17 @@ use super::opcode::{Opcode, Parameter};
 #[derive(Debug, Clone)]
 pub struct Process {
     pc: usize,
-    intcode: Vec<i32>,
-    memory: BTreeMap<i32, i32>,
-    relbase: i32,
+    intcode: Vec<i64>,
+    memory: BTreeMap<i64, i64>,
+    relbase: i64,
     status: ProcessStatus,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProcessStatus {
     Paused,
-    Outputting(i32),
-    Awaiting(Parameter<i32>),
+    Outputting(i64),
+    Awaiting(Parameter<i64>),
     Exit,
 }
 use ProcessStatus::*;
@@ -27,7 +27,7 @@ impl ProcessStatus {}
 
 impl Process {
     pub fn new(code: Intcode) -> Self {
-        let v: Vec<i32> = code.into();
+        let v: Vec<i64> = code.into();
         Process {
             pc: 0,
             intcode: v,
@@ -37,7 +37,7 @@ impl Process {
         }
     }
 
-    fn set(&mut self, param: &Parameter<i32>, value: i32) -> Result<(), String> {
+    fn set(&mut self, param: &Parameter<i64>, value: i64) -> Result<(), String> {
         match param {
             Parameter::Pos(key) => Ok({
                 self.memory.insert(*key, value);
@@ -50,7 +50,7 @@ impl Process {
         }
     }
 
-    // fn try_set(&mut self, param: &Parameter<i32>, value: i32) -> Result<(), String> {
+    // fn try_set(&mut self, param: &Parameter<i64>, value: i64) -> Result<(), String> {
     //     match *param {
     //         Parameter::Imm(_) => Err("Can't set to immediate value.".to_owned()),
     //         Parameter::Pos(p) => {
@@ -62,7 +62,7 @@ impl Process {
     //     }
     // }
 
-    fn get(&self, param: &Parameter<i32>) -> Result<i32, String> {
+    fn get(&self, param: &Parameter<i64>) -> Result<i64, String> {
         match *param {
             Parameter::Imm(x) => Ok(x),
             // TODO join Pos and Rel
@@ -73,7 +73,12 @@ impl Process {
                     let x: usize = p
                         .try_into()
                         .map_err(|_| format!("Invalid index from {:?}", param).to_owned())?;
-                    Ok(self.intcode[x])
+                    if x < self.intcode.len() {
+                        Ok(self.intcode[x])
+                    } else {
+                        // 0 is the default value
+                        Ok(0)
+                    }
                 }
             }
             Parameter::Rel(rel_p) => {
@@ -98,14 +103,14 @@ impl Process {
         self.pc += steps;
     }
 
-    fn inc_setter<'a>(&'a self) -> Box<dyn FnMut(&Parameter<()>) -> Parameter<i32> + 'a> {
-        let mut i: i32 = 0;
+    fn inc_setter<'a>(&'a self) -> Box<dyn FnMut(&Parameter<()>) -> Parameter<i64> + 'a> {
+        let mut i: i64 = 0;
         Box::new(move |m| {
             i += 1;
-            let pc: Result<i32, _> = self.pc.try_into();
+            let pc: Result<i64, _> = self.pc.try_into();
             match pc {
                 Ok(position) => {
-                    let value = self.get(&Parameter::Imm(position + i)).unwrap();
+                    let value = self.get(&Parameter::Pos(position + i)).unwrap();
                     m.map(|_| value)
                 }
                 Err(_) => unreachable!(),
@@ -113,11 +118,11 @@ impl Process {
         })
     }
 
-    fn populate(&self, code: Opcode<Parameter<()>>) -> Opcode<Parameter<i32>> {
+    fn populate(&self, code: Opcode<Parameter<()>>) -> Opcode<Parameter<i64>> {
         code.mut_map(&mut self.inc_setter())
     }
 
-    fn current(&self) -> Result<Opcode<Parameter<i32>>, String> {
+    fn current(&self) -> Result<Opcode<Parameter<i64>>, String> {
         let code: Opcode<Parameter<()>> = self.intcode[self.pc].try_into()?;
         let op = self.populate(code);
         Ok(op)
@@ -139,16 +144,13 @@ impl Process {
         match ev {
             Input(dest) => self.status = Awaiting(dest),
             Output(o) => self.status = Outputting(o),
-            EvaluationError(s) => {
-                println!("{}", s);
-                self.status = Exit
-            }
+            EvaluationError(_s) => self.status = Exit,
             Halt => self.status = Exit,
         };
         self.status
     }
 
-    pub fn feed(&mut self, input: i32) -> ProcessStatus {
+    pub fn feed(&mut self, input: i64) -> ProcessStatus {
         match self.status {
             Awaiting(dest) => {
                 self.set(&dest, input).unwrap();
@@ -159,7 +161,7 @@ impl Process {
         }
     }
 
-    pub fn head(&self) -> i32 {
+    pub fn head(&self) -> i64 {
         self.intcode[0]
     }
 
@@ -185,7 +187,7 @@ impl Process {
             }
             Inp(a) => {
                 self.inc(2);
-                Input(a.try_map(|&x| x.try_into()).unwrap())
+                Input(a)
             }
             Jnz(a, b) => {
                 if self.get(&a)? != 0 {
@@ -231,8 +233,8 @@ impl Process {
 
 use Evaluation::*;
 pub enum Evaluation {
-    Input(Parameter<i32>),
-    Output(i32),
+    Input(Parameter<i64>),
+    Output(i64),
     Halt,
     EvaluationError(String),
 }
@@ -249,5 +251,5 @@ impl<'a> fmt::Debug for Evaluation {
 }
 
 pub trait Runnable {
-    fn run(&mut self, input: i32) -> Option<i32>;
+    fn run(&mut self, input: i64) -> Option<i64>;
 }
